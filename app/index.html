@@ -1,0 +1,46 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>好吃预测器</title><style>
+:root{--bg:#faf7f2;--card:#fff;--ink:#2d2a26;--mut:#8a8378;--acc:#c96f4a;--good:#5a9e6f;--bad:#c94a4a;--bar:#eee7dc}
+*{box-sizing:border-box}body{margin:0;font:15px/1.6 system-ui,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--ink);padding:24px}
+.wrap{max-width:860px;margin:0 auto}h1{font-size:22px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:1fr 320px;gap:18px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid #ece5da;border-radius:12px;padding:16px}
+textarea{width:100%;height:280px;border:1px solid #ddd3c4;border-radius:8px;padding:10px;font:13px/1.5 ui-monospace,monospace;resize:vertical;background:#fffdf9;color:var(--ink)}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:10px 22px;font-size:15px;cursor:pointer;margin-top:10px}
+button:disabled{opacity:.5}.ex{background:none;border:1px solid #ddd3c4;color:var(--mut);padding:4px 10px;font-size:12px;margin:0 6px 0 0}
+.score{font-size:44px;font-weight:700;text-align:center;margin:6px 0 2px}.score small{font-size:16px;color:var(--mut);font-weight:400}
+.verdict{text-align:center;color:var(--mut);margin-bottom:14px}.risk{margin:7px 0}.risk .l{display:flex;justify-content:space-between;font-size:13px}
+.bar{height:8px;background:var(--bar);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;border-radius:4px;transition:width .5s}
+.hint{color:var(--mut);font-size:12px;margin-top:12px}.spin{text-align:center;color:var(--mut);padding:40px 0}
+</style></head><body><div class="wrap">
+<h1>好吃预测器 <span style="font-size:13px;color:var(--mut)">Qwen3.8-27B · 112万条真实评论训练</span></h1>
+<div class="sub">粘贴一份食谱（中英文皆可；实测中文输入保留约80%排序能力。格式：名称 / 时长步骤 / 食材 / 步骤），预测社区评分与风味风险。</div>
+<div class="grid"><div class="card">
+<div style="margin-bottom:8px"><button class="ex" onclick="ex(0)">示例：烤鸡</button><button class="ex" onclick="ex(1)">示例：脱脂阿尔弗雷多</button><button class="ex" onclick="ex(2)">清空</button></div>
+<textarea id="t" spellcheck="false"></textarea><br><button id="go" onclick="run()">预测</button>
+<div class="hint">推理约 2 秒 · 模型仅凭食谱文本判断，不联网查询</div></div>
+<div class="card" id="out"><div class="spin">← 输入食谱后点击预测</div></div></div></div>
+<script>
+const EX=[`Garlic butter herb roast chicken\n90 minutes, 8 steps\nIngredients: whole chicken; butter; garlic; rosemary; thyme; lemon; salt; black pepper\nSteps: 1. pat chicken dry and season generously 2. stuff cavity with lemon and herbs 3. rub garlic butter under the skin 4. roast at 425F for 20 minutes 5. reduce to 350F and roast until juices run clear 6. baste twice 7. rest 15 minutes 8. serve with pan sauce`,
+`Fat-free microwave alfredo pasta\n12 minutes, 4 steps\nIngredients: pasta; fat-free evaporated milk; cornstarch; garlic powder; artificial butter sprinkles; fat-free processed cheese slices\nSteps: 1. boil pasta 2. microwave evaporated milk with cornstarch until thick 3. stir in cheese slices and butter sprinkles 4. pour over pasta`,``];
+const NAMES={bland:'偏淡 / 没味道',dry:'口感偏干',soggy:'湿软不脆',tough:'肉质偏柴',watery:'汤汁稀薄',make_again:'愿意再做',hard:'制作费劲'};
+function ex(i){document.getElementById('t').value=EX[i]}
+async function run(){
+  const t=document.getElementById('t').value.trim(); if(!t)return;
+  const out=document.getElementById('out'),btn=document.getElementById('go');
+  btn.disabled=true; out.innerHTML='<div class="spin">推理中…</div>';
+  try{
+    const r=await fetch('/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+    const d=await r.json(); if(d.error)throw new Error(d.error);
+    const pct=Math.max(0,Math.min(100,(d.rating-4.0)/(5.0-4.0)*100));
+    let verdict=d.rating>=4.75?'👍 大概率广受好评':d.rating>=4.6?'不错，中上水平':d.rating>=4.45?'平平，有改进空间':'⚠️ 风险偏高';
+    let html=`<div class="score">${d.rating.toFixed(2)}<small> / 5</small></div><div class="verdict">${verdict}（社区均值 4.66）</div>`;
+    for(const[k,v]of Object.entries(d.risks)){
+      const good=k==='make_again', col=good?(v>0.5?'var(--good)':'var(--bad)'):(v>0.35?'var(--bad)':v>0.2?'var(--acc)':'var(--good)');
+      html+=`<div class="risk"><div class="l"><span>${NAMES[k]}</span><span>${(v*100).toFixed(0)}%</span></div><div class="bar"><i style="width:${(v*100).toFixed(0)}%;background:${col}"></i></div></div>`;
+    }
+    out.innerHTML=html;
+  }catch(e){out.innerHTML='<div class="spin">出错了：'+e.message+'</div>'}
+  btn.disabled=false;
+}
+</script></body></html>

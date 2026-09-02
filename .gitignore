@@ -1,0 +1,8 @@
+# Source data (download from Kaggle yourself; not redistributable here)
+data/
+# Run artifacts: 1.4M-row label file, checkpoints, benchmarks (rebuildable; see release/)
+out/
+# Container-installed python deps (pip install into .deps, see README)
+.deps/
+__pycache__/
+*.pyc
